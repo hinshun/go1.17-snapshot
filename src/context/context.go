@@ -235,7 +235,8 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 	}
 	c := newCancelCtx(parent)
 	propagateCancel(parent, &c)
-	return &c, func() { c.cancel(true, Canceled) }
+	err := WithStack("WithCancel", Canceled)
+	return &c, func() { c.cancel(true, err) }
 }
 
 // newCancelCtx returns an initialized cancelCtx.
@@ -403,7 +404,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 		c.mu.Unlock()
 		return // already canceled
 	}
-	c.err = err
+	c.err = WithStack("CancelSite", err)
 	d, _ := c.done.Load().(chan struct{})
 	if d == nil {
 		c.done.Store(closedchan)
@@ -446,17 +447,20 @@ func WithDeadline(parent Context, d time.Time) (Context, CancelFunc) {
 	propagateCancel(parent, c)
 	dur := time.Until(d)
 	if dur <= 0 {
-		c.cancel(true, DeadlineExceeded) // deadline has already passed
-		return c, func() { c.cancel(false, Canceled) }
+		c.cancel(true, WithStack("WithDeadline0", DeadlineExceeded)) // deadline has already passed
+		canceled := WithStack("WithDeadline1", Canceled)
+		return c, func() { c.cancel(false, canceled) }
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.err == nil {
+		exceeded := WithStack("WithDeadline2",DeadlineExceeded)
 		c.timer = time.AfterFunc(dur, func() {
-			c.cancel(true, DeadlineExceeded)
+			c.cancel(true, exceeded)
 		})
 	}
-	return c, func() { c.cancel(true, Canceled) }
+	canceled := WithStack("WithDeadline3", Canceled)
+	return c, func() { c.cancel(true, canceled) }
 }
 
 // A timerCtx carries a timer and a deadline. It embeds a cancelCtx to
