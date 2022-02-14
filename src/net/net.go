@@ -419,14 +419,13 @@ var (
 // TODO(bradfitz): get rid of this after adjusting tests and making
 // context.DeadlineExceeded implement net.Error?
 func mapErr(err error) error {
-	switch err {
-	case context.Canceled:
+	if errors.Is(err, context.Canceled) {
 		return errCanceled
-	case context.DeadlineExceeded:
-		return errTimeout
-	default:
-		return err
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return errTimeout
+	}
+	return err
 }
 
 // OpError is the error type usually returned by functions in the net
